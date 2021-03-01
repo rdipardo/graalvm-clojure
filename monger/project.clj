@@ -19,7 +19,7 @@
     "--no-server"
     "--initialize-at-build-time"
     "--enable-url-protocols=http,https"
-    #"--initialize-at-run-time=sun.security.ssl.SSLContextImpl$DefaultSSLContextHolder,com.mongodb.UnixServerAddress,com.mongodb.internal.connection.SnappyCompressor,com.mongodb.internal.connection.UnixSocketChannelStream"
+    #"--initialize-at-run-time=org.bson.json.DateTimeFormatter$JaxbDateTimeFormatter,sun.security.ssl.SSLContextImpl$DefaultSSLContextHolder,com.mongodb.UnixServerAddress,com.mongodb.internal.connection.SnappyCompressor,com.mongodb.internal.connection.UnixSocketChannelStream"
     "-jar" "./target/${:uberjar-name:-${:name}-${:version}-standalone.jar}"
     "-H:+AllowIncompleteClasspath"
     "-H:Name=./target/${:name}"]
