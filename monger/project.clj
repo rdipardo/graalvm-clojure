@@ -1,6 +1,6 @@
 (defproject monger "0.1.0-SNAPSHOT"
 
-  :dependencies [[org.clojure/clojure "1.10.1"]
+  :dependencies [[org.clojure/clojure "1.10.2"]
                  [com.novemberain/monger "3.5.0"]
                  ]
 
@@ -19,7 +19,7 @@
     "--no-server"
     "--initialize-at-build-time"
     "--enable-url-protocols=http,https"
-    "--initialize-at-run-time=com.mongodb.UnixServerAddress,com.mongodb.internal.connection.SnappyCompressor,com.mongodb.internal.connection.UnixSocketChannelStream"
+    #"--initialize-at-run-time=sun.security.ssl.SSLContextImpl$DefaultSSLContextHolder,com.mongodb.UnixServerAddress,com.mongodb.internal.connection.SnappyCompressor,com.mongodb.internal.connection.UnixSocketChannelStream"
     "-jar" "./target/${:uberjar-name:-${:name}-${:version}-standalone.jar}"
     "-H:+AllowIncompleteClasspath"
     "-H:Name=./target/${:name}"]
