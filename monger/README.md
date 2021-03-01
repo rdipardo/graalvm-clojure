@@ -27,6 +27,88 @@ Test with:
 `[monger.collection :as mc]` :x:   
 `[monger.credentials :as mcr]` :x:   
 
+## Attempted workaround #2
+
+Last time the error message began with:
+
+```
+Warning: Aborting stand-alone image build. Unsupported features in 2 methods
+Detailed message:
+Error: Class initialization of org.bson.json.DateTimeFormatter$JaxbDateTimeFormatter failed. Use the option --initialize-at-run-time=org.bson.json.DateTimeFormatter$JaxbDateTimeFormatter to explicitly request delayed initialization of this class.
+. . . .
+```
+
+Why not?
+
+```clojure
+; project.clj
+
+	#"--initialize-at-run-time=org.bson.json.DateTimeFormatter$JaxbDateTimeFormatter,sun.security.ssl.SSLContextImpl$DefaultSSLContextHolder,com.mongodb.UnixServerAddress,com.mongodb.internal.connection.SnappyCompressor,com.mongodb.internal.connection.UnixSocketChannelStream"
+```
+
+## Notes
+Another crippled "fallback image" is generated, but with a much cleaner stack trace:
+```
+[./target/monger:23844]    classlist:  11,060.42 ms,  0.96 GB
+[./target/monger:23844]        (cap):   4,441.75 ms,  0.96 GB
+[./target/monger:23844]        setup:  15,418.85 ms,  0.96 GB
+[./target/monger:23844]     (clinit):   2,887.05 ms,  1.45 GB
+[./target/monger:23844]   (typeflow):  99,129.04 ms,  1.45 GB
+[./target/monger:23844]    (objects):  65,146.99 ms,  1.45 GB
+[./target/monger:23844]   (features):   4,762.56 ms,  1.45 GB
+[./target/monger:23844]     analysis: 181,215.57 ms,  1.45 GB
+Warning: Aborting stand-alone image build. No instances of sun.security.provider.NativePRNG are allowed in the image heap as this class should be initialized at image runtime. To see how this object got instantiated use --trace-object-instantiation=sun.security.provider.NativePRNG.
+Detailed message:
+Trace: Object was reached by
+	reading field java.security.SecureRandom.secureRandomSpi of
+		constant java.security.SecureRandom@698a15f8 reached by
+	reading field sun.security.ssl.SSLContextImpl.secureRandom of
+		constant sun.security.ssl.SSLContextImpl$DefaultSSLContext@401e547f reached by
+	reading field sun.security.ssl.SSLSocketFactoryImpl.context of
+		constant sun.security.ssl.SSLSocketFactoryImpl@15a718be reached by
+	scanning method com.mongodb.MongoClientOptions.getSocketFactory(MongoClientOptions.java:703)
+Call path from entry point to com.mongodb.MongoClientOptions.getSocketFactory():
+	at com.mongodb.MongoClientOptions.getSocketFactory(MongoClientOptions.java:700)
+	at com.mongodb.Mongo.createCluster(Mongo.java:757)
+	at com.mongodb.Mongo.createCluster(Mongo.java:743)
+	at com.mongodb.Mongo.<init>(Mongo.java:295)
+	at com.mongodb.Mongo.<init>(Mongo.java:290)
+	at com.mongodb.MongoClient.<init>(MongoClient.java:195)
+	at monger.core$connect.invokeStatic(core.clj:91)
+	at monger.core$connect.invoke(core.clj:66)
+	at clojure.lang.AFn.applyToHelper(AFn.java:160)
+	at clojure.lang.Keyword.applyTo(Keyword.java:253)
+	at simple.main.main(Unknown Source)
+	at com.oracle.svm.core.JavaMainWrapper.runCore(JavaMainWrapper.java:146)
+	at com.oracle.svm.core.JavaMainWrapper.run(JavaMainWrapper.java:182)
+	at com.oracle.svm.core.code.IsolateEnterStub.JavaMainWrapper_run_5087f5482cc9a6abc971913ece43acb471d2631b(generated:0)
+
+Warning: Use -H:+ReportExceptionStackTraces to print stacktrace of underlying exception
+[./target/monger:24201]    classlist:   7,536.55 ms,  0.96 GB
+[./target/monger:24201]        (cap):   3,428.05 ms,  0.96 GB
+[./target/monger:24201]        setup:  12,871.21 ms,  0.96 GB
+[./target/monger:24201]     (clinit):   1,064.89 ms,  1.47 GB
+[./target/monger:24201]   (typeflow):  29,950.13 ms,  1.47 GB
+[./target/monger:24201]    (objects):  17,838.72 ms,  1.47 GB
+[./target/monger:24201]   (features):   1,298.75 ms,  1.47 GB
+[./target/monger:24201]     analysis:  51,223.41 ms,  1.47 GB
+[./target/monger:24201]     universe:   2,476.58 ms,  1.47 GB
+[./target/monger:24201]      (parse):  12,670.52 ms,  1.47 GB
+[./target/monger:24201]     (inline):   6,935.83 ms,  1.47 GB
+[./target/monger:24201]    (compile):  58,093.97 ms,  1.40 GB
+[./target/monger:24201]      compile:  80,550.21 ms,  1.40 GB
+[./target/monger:24201]        image:   6,771.29 ms,  1.27 GB
+[./target/monger:24201]        write:     905.91 ms,  1.27 GB
+[./target/monger:24201]      [total]: 163,383.31 ms,  1.27 GB
+Warning: Image './target/monger' is a fallback image that requires a JDK for execution (use --no-fallback to suppress fallback image generation and to print more detailed information why a fallback image was necessary).
+Building with native build. Learn about native build in Compose here: https://docs.docker.com/go/compose-native-build/
+Recreating monger_database_1 ... done
+Waiting for database . . .
+./target/monger
+Error: Could not find or load main class simple.main
+Caused by: java.lang.ClassNotFoundException: simple.main
+```
+
 ## Attempted workaround #1
 
 Following the suggestion of [this thread](https://github.com/oracle/graal/issues/712#issuecomment-466843789), delay initializing `sun.security.ssl.SSLContextImpl$DefaultSSLContextHolder` until runtime:
