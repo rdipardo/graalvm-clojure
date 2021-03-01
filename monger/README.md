@@ -27,6 +27,165 @@ Test with:
 `[monger.collection :as mc]` :x:   
 `[monger.credentials :as mcr]` :x:   
 
+## Attempted workaround #3
+
+Adding this to the configuration for extra diagnostics:
+
+```clojure
+; project.clj
+
+	"--trace-object-instantiation=sun.security.provider.NativePRNG"
+```
+
+generates the same crippled binary as before, but now with a helpful suggestion:
+
+> To fix the issue mark sun.security.provider.NativePRNG for build-time
+> initialization with --initialize-at-build-time=sun.security.provider.NativePRNG
+> or use the the information from the trace to find the culprit and
+> --initialize-at-run-time=<culprit> to prevent its instantiation.
+
+Taking the first option swiftly crashes the build:
+```
+[./target/monger:6952]    classlist:  12,683.39 ms,  0.96 GB
+[./target/monger:6952]        (cap):   2,560.21 ms,  0.96 GB
+[./target/monger:6952]        setup:   7,383.27 ms,  0.96 GB
+Error: Incompatible change of initialization policy for sun.security.provider.NativePRNG: trying to change BUILD_TIME from the command line to RERUN for substitutions
+Error: Use -H:+ReportExceptionStackTraces to print stacktrace of underlying exception
+Error: Image build request failed with exit status 1
+```
+
+(I can confirm that passing the same class to `--initialize-at-run-time` gets the
+identical result except with `RUN_TIME` in place of `BUILD_TIME`.)
+
+The second option would be RT initialization of the "culprit", to be chosen from
+the call chain provided in the complete stack trace:
+```
+Warning: Aborting stand-alone image build. No instances of sun.security.provider.NativePRNG are allowed in the image heap as this class should be initialized at image runtime. Object has been initialized by the simple.main class initializer with a trace:
+ 	at sun.security.provider.NativePRNG.<init>(NativePRNG.java:205)
+	at jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Unknown Source)
+	at jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+	at jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:490)
+	at java.security.Provider.newInstanceUtil(Provider.java:176)
+	at java.security.Provider$Service.newInstance(Provider.java:1894)
+	at java.security.SecureRandom.getDefaultPRNG(SecureRandom.java:290)
+	at java.security.SecureRandom.<init>(SecureRandom.java:219)
+	at sun.security.ssl.JsseJce.getSecureRandom(JsseJce.java:281)
+	at sun.security.ssl.SSLContextImpl.engineInit(SSLContextImpl.java:97)
+	at sun.security.ssl.SSLContextImpl$DefaultSSLContext.<init>(SSLContextImpl.java:1203)
+	at jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance0(Unknown Source)
+	at jdk.internal.reflect.NativeConstructorAccessorImpl.newInstance(NativeConstructorAccessorImpl.java:62)
+	at jdk.internal.reflect.DelegatingConstructorAccessorImpl.newInstance(DelegatingConstructorAccessorImpl.java:45)
+	at java.lang.reflect.Constructor.newInstance(Constructor.java:490)
+	at java.security.Provider.newInstanceUtil(Provider.java:154)
+	at java.security.Provider$Service.newInstance(Provider.java:1894)
+	at sun.security.jca.GetInstance.getInstance(GetInstance.java:236)
+	at sun.security.jca.GetInstance.getInstance(GetInstance.java:164)
+	at javax.net.ssl.SSLContext.getInstance(SSLContext.java:168)
+	at javax.net.ssl.SSLContext.getDefault(SSLContext.java:99)
+	at javax.net.ssl.SSLSocketFactory.getDefault(SSLSocketFactory.java:123)
+	at com.mongodb.MongoClientOptions.<clinit>(MongoClientOptions.java:59)
+	at java.lang.Class.forName0(Unknown Source)
+	at java.lang.Class.forName(Class.java:398)
+	at clojure.lang.RT.classForName(RT.java:2212)
+	at clojure.lang.RT.classForName(RT.java:2221)
+	at monger.core__init.__init0(Unknown Source)
+	at monger.core__init.<clinit>(Unknown Source)
+	at java.lang.Class.forName0(Unknown Source)
+	at java.lang.Class.forName(Class.java:398)
+	at clojure.lang.RT.classForName(RT.java:2212)
+	at clojure.lang.RT.classForName(RT.java:2221)
+	at clojure.lang.RT.loadClassForName(RT.java:2240)
+	at clojure.lang.RT.load(RT.java:449)
+	at clojure.lang.RT.load(RT.java:424)
+	at clojure.core$load$fn__6857.invoke(core.clj:6115)
+	at clojure.core$load.invokeStatic(core.clj:6114)
+	at clojure.core$load.doInvoke(core.clj:6098)
+	at clojure.lang.RestFn.invoke(RestFn.java:408)
+	at clojure.core$load_one.invokeStatic(core.clj:5897)
+	at clojure.core$load_one.invoke(core.clj:5892)
+	at clojure.core$load_lib$fn__6797.invoke(core.clj:5937)
+	at clojure.core$load_lib.invokeStatic(core.clj:5936)
+	at clojure.core$load_lib.doInvoke(core.clj:5917)
+	at clojure.lang.RestFn.applyTo(RestFn.java:142)
+	at clojure.core$apply.invokeStatic(core.clj:669)
+	at clojure.core$load_libs.invokeStatic(core.clj:5974)
+	at clojure.core$load_libs.doInvoke(core.clj:5958)
+	at clojure.lang.RestFn.applyTo(RestFn.java:137)
+	at clojure.core$apply.invokeStatic(core.clj:669)
+	at clojure.core$require.invokeStatic(core.clj:5996)
+	at clojure.core$require.doInvoke(core.clj:5996)
+	at clojure.lang.RestFn.invoke(RestFn.java:457)
+	at simple.main$loading__6738__auto____171.invoke(main.clj:1)
+	at simple.main__init.load(Unknown Source)
+	at simple.main__init.<clinit>(Unknown Source)
+	at java.lang.Class.forName0(Unknown Source)
+	at java.lang.Class.forName(Class.java:398)
+	at clojure.lang.RT.classForName(RT.java:2212)
+	at clojure.lang.RT.classForName(RT.java:2221)
+	at clojure.lang.RT.loadClassForName(RT.java:2240)
+	at clojure.lang.RT.load(RT.java:449)
+	at clojure.lang.RT.load(RT.java:424)
+	at clojure.core$load$fn__6857.invoke(core.clj:6115)
+	at clojure.core$load.invokeStatic(core.clj:6114)
+	at clojure.core$load.doInvoke(core.clj:6098)
+	at clojure.lang.RestFn.invoke(RestFn.java:408)
+	at clojure.lang.Var.invoke(Var.java:384)
+	at clojure.lang.Util.loadWithClass(Util.java:251)
+	at simple.main.<clinit>(Unknown Source)
+.  To fix the issue mark sun.security.provider.NativePRNG for build-time initialization with --initialize-at-build-time=sun.security.provider.NativePRNG or use the the information from the trace to find the culprit and --initialize-at-run-time=<culprit> to prevent its instantiation.
+
+Detailed message:
+Trace: Object was reached by
+	reading field java.security.SecureRandom.secureRandomSpi of
+		constant java.security.SecureRandom@6438ef0c reached by
+	reading field sun.security.ssl.SSLContextImpl.secureRandom of
+		constant sun.security.ssl.SSLContextImpl$DefaultSSLContext@2bb02e9f reached by
+	reading field sun.security.ssl.SSLSocketFactoryImpl.context of
+		constant sun.security.ssl.SSLSocketFactoryImpl@672fe6cf reached by
+	scanning method com.mongodb.MongoClientOptions.getSocketFactory(MongoClientOptions.java:703)
+Call path from entry point to com.mongodb.MongoClientOptions.getSocketFactory():
+	at com.mongodb.MongoClientOptions.getSocketFactory(MongoClientOptions.java:700)
+	at com.mongodb.Mongo.createCluster(Mongo.java:757)
+	at com.mongodb.Mongo.createCluster(Mongo.java:743)
+	at com.mongodb.Mongo.<init>(Mongo.java:295)
+	at com.mongodb.Mongo.<init>(Mongo.java:290)
+	at com.mongodb.MongoClient.<init>(MongoClient.java:195)
+	at monger.core$connect.invokeStatic(core.clj:91)
+	at monger.core$connect.invoke(core.clj:66)
+	at clojure.spec.alpha$multi_spec_impl$reify__2075$gen__2077$fn__2081.invoke(alpha.clj:988)
+	at clojure.lang.AFn.run(AFn.java:22)
+	at java.lang.Thread.run(Thread.java:834)
+	at com.oracle.svm.core.thread.JavaThreads.threadStartRoutine(JavaThreads.java:519)
+	at com.oracle.svm.core.posix.thread.PosixJavaThreads.pthreadStartRoutine(PosixJavaThreads.java:192)
+	at com.oracle.svm.core.code.IsolateEnterStub.PosixJavaThreads_pthreadStartRoutine_e1f4a8c0039f8337338252cd8734f63a79b5e3df(generated:0)
+
+Warning: Use -H:+ReportExceptionStackTraces to print stacktrace of underlying exception
+[./target/monger:6053]    classlist:   9,214.85 ms,  0.96 GB
+[./target/monger:6053]        (cap):   5,353.00 ms,  0.96 GB
+[./target/monger:6053]        setup:  15,822.46 ms,  0.96 GB
+[./target/monger:6053]     (clinit):   1,281.69 ms,  1.47 GB
+[./target/monger:6053]   (typeflow):  29,801.14 ms,  1.47 GB
+[./target/monger:6053]    (objects):  18,415.93 ms,  1.47 GB
+[./target/monger:6053]   (features):   1,042.13 ms,  1.47 GB
+[./target/monger:6053]     analysis:  51,564.12 ms,  1.47 GB
+[./target/monger:6053]     universe:   2,353.70 ms,  1.47 GB
+[./target/monger:6053]      (parse):  12,583.34 ms,  1.47 GB
+[./target/monger:6053]     (inline):   7,214.90 ms,  1.47 GB
+[./target/monger:6053]    (compile):  57,896.22 ms,  1.40 GB
+[./target/monger:6053]      compile:  80,581.89 ms,  1.40 GB
+[./target/monger:6053]        image:   6,940.22 ms,  1.27 GB
+[./target/monger:6053]        write:     905.26 ms,  1.27 GB
+[./target/monger:6053]      [total]: 168,590.00 ms,  1.27 GB
+Warning: Image './target/monger' is a fallback image that requires a JDK for execution (use --no-fallback to suppress fallback image generation and to print more detailed information why a fallback image was necessary).
+Building with native build. Learn about native build in Compose here: https://docs.docker.com/go/compose-native-build/
+Recreating monger_database_1 ... done
+Waiting for database . . .
+./target/monger
+Error: Could not find or load main class simple.main
+Caused by: java.lang.ClassNotFoundException: simple.main
+```
+
 ## Attempted workaround #2
 
 Last time the error message began with:
